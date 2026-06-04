@@ -95,6 +95,9 @@ RMII TXD1
 
 否則 Ethernet 傳送資料不完整。
 
+
+![NUCLEO-H755ZI-Q](images/EVboard.png)
+
 ---
 
 # 除錯流程紀錄
