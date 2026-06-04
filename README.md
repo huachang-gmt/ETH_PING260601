@@ -1,16 +1,3 @@
-> [!WARNING]
-> NUCLEO-H755ZI-Q 使用 RMII Ethernet 時，
-> 請務必確認 JP6（RMII TXD1）已安裝 Jumper。
->
-> 若 JP6 未接上：
->
-> - PHY Link Up 正常
-> - LAN8742_Init() 成功
-> - HAL_ETH_Init() 成功
-> - 網路孔 LED 正常
->
-> 但 Ping 會永遠失敗。
-
 # STM32H755ZI-Q Ethernet + LwIP 網路建立與除錯紀錄
 
 ## 專案簡介
@@ -20,7 +7,7 @@
 * STM32H755ZIT6
 * Cortex-M4
 * LAN8742A PHY
-* RMII 介面
+* RMII（Reduced Media Independent Interface）介面
 * STM32 HAL Ethernet Driver
 * LwIP TCP/IP Stack
 
@@ -621,6 +608,68 @@ Reply from 192.168.88.10
 ✅ Ping 成功
 
 ✅ 可進入 FTP Server 開發階段
+
+---
+
+# CM7 要修改的檔案 - main.c
+
+```c
+#define DUAL_CORE_BOOT_SYNC_SEQUENCE  // 必須存在
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    // 喚醒 Cortex-M4 核心
+    HAL_PWREx_ReleaseCore(PWR_CORE_CPU2);// 這是重點 
+
+    BspCOMInit.BaudRate   = 115200;
+    BspCOMInit.WordLength = COM_WORDLENGTH_8B;
+    BspCOMInit.StopBits   = COM_STOPBITS_1;
+    BspCOMInit.Parity     = COM_PARITY_NONE;
+    BspCOMInit.HwFlowCtl  = COM_HWCONTROL_NONE;
+    if (BSP_COM_Init(COM1, &BspCOMInit) != BSP_ERROR_NONE)
+    {
+        Error_Handler();
+    }
+
+    /* ------------------ CRITICAL MODIFICATION BEGIN ------------------ */
+    
+    // 1. 啟用 SYSCFG 時脈（SYSCFG 位於 APB4 總線，控制了全晶片的引腳網路模式切換）
+    __HAL_RCC_SYSCFG_CLK_ENABLE();
+
+    // 2. 強制將乙太網路硬體介面切換為 RMII 模式。
+    //    這行硬體設定必須在 CM4 核心啟動並初始化網路之前，由 CM7 先行在底層組態完成！
+    HAL_SYSCFG_ETHInterfaceSelect(SYSCFG_ETH_RMII);
+
+    /* ------------------- CRITICAL MODIFICATION END ------------------- */
+
+    /* Infinite loop */
+    /* USER CODE BEGIN WHILE */
+    while (1)
+    {
+        /* USER CODE END WHILE */
+
+        /* USER CODE BEGIN 3 */
+    }
+    /* USER CODE END 3 */
+    }
+```
+
+---
+
+> [!WARNING]
+> NUCLEO-H755ZI-Q 使用 RMII Ethernet 時，
+> 請務必確認 JP6（RMII TXD1）已安裝 Jumper。
+>
+> 若 JP6 未接上：
+>
+> - PHY Link Up 正常
+> - LAN8742_Init() 成功
+> - HAL_ETH_Init() 成功
+> - 網路孔 LED 正常
+>
+> 但 Ping 會永遠失敗。
 
 ---
 
